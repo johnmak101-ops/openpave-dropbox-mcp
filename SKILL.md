@@ -101,7 +101,7 @@ The other two outcomes, kept for fallback if Dropbox changes behavior:
 2. **DCR refused** → pin your own app: register in the Dropbox App Console,
    set `auth.oauth.clientId` (+ `authorizeUrl`/`tokenUrl` pins) on the
    `servers.json` entry. Resolution order: persisted DCR id > registry pin >
-   fresh DCR. `[PAVE source — mcp-oauth-flow.js:402-403]`
+   fresh DCR. `[PAVE source — mcp-oauth-flow.js:403-406]`
 3. **Confidential client demanded** → PAVE refuses the flow before minting
    state (#3110 guard) and names the bearer path. Bearer is a poor fit:
    Dropbox access tokens are short-lived (~4 h). `[PAVE source — mcp-oauth-flow.js:397-400]` `[web — token lifetime]`
@@ -280,6 +280,12 @@ node probe/dropbox-probe.mjs schema <tool>
   returned nested tree across 4 namespaces]`
 - Pagination is cursor-based (`cursor` in, `cursor` out) on `list_folder`,
   `search`, `list_shared_links`, `list_file_requests`, `list_restore_events`.
+- **Do not reuse a cursor from a response you did not fully read.** If the
+  bridge truncated the payload (a long recursive listing, for example), re-issue
+  the call rather than continuing from that cursor — the cursor belongs to a
+  page whose contents you never saw, and the gap is silent.
+  `[verified 2026-11-06 — recursive list_folder on a real tree returned entries
+  plus a cursor while the transcript was truncated; re-issuing was the fix]`
 
 ## 5. Diagnostic fallback: drive the server directly
 
@@ -513,4 +519,21 @@ Delete every temp file that held a token, a code, or a PKCE verifier — e.g.
 
 Compare against this table rather than against "it seemed to work". Every row
 was observed on a working install. `[verified 2026-11-06]`
+
+### 9.9 After ~4 h — confirm unattended refresh
+
+The access token lives ~14400 s. Setup is not fully proven until a call succeeds
+**after** that expiry without human help. When the window has passed:
+
+1. Call `who_am_i`.
+2. Success → unattended refresh works; the install is complete.
+3. `401` → run `capabilities_refresh dropbox` once, then re-check. If that
+   fixes it, refresh is not unattended and §2 step 7's pins need re-checking
+   (compare them verbatim against `servers.json`).
+
+Whatever the outcome: **never** run `capabilities_add` to recover — it resets
+`auth` to `none` and destroys the config.
+
+`[untested — the working run installed at ~04:05Z and scheduled this check for
+~08:05Z rather than waiting; the result was not recorded]`
 

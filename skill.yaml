@@ -2,7 +2,7 @@
 # Doctrine skill for the remote Dropbox MCP server (mcp.dropbox.com/mcp)
 
 name: dropbox-mcp
-version: 0.2.0
+version: 0.2.1
 description: Operate Dropbox through the remote MCP server (mcp.dropbox.com/mcp, bridged as mcp_dropbox_* tools) - verified doctrines for install, OAuth, and file operations
 
 author:
